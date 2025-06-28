@@ -32,12 +32,6 @@ app.use(express.json());
 // 🔐 Auth Routes
 app.use('/auth', authRoutes);
 
-// 🧾 Serve React frontend build (after build)
-app.use(express.static(path.join(__dirname, 'frontend/build')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend/build/index.html'));
-});
-
 // 🌍 MongoDB connection
 mongoose
   .connect(MONGO_URI, {
