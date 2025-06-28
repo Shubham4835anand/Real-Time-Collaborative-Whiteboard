@@ -81,6 +81,10 @@ function Room() {
 
   const draw = (e) => {
     if (!isDrawing || !prevPos) return;
+
+    // Prevent drawing on UI controls
+    if (e.target.id !== 'canvas') return;
+
     const { offsetX, offsetY } = e.nativeEvent;
     const newPos = { x: offsetX, y: offsetY };
 
@@ -144,12 +148,10 @@ function Room() {
         onMouseUp={endDrawing}
         onMouseLeave={endDrawing}
         style={{
-          display: 'block',
-          cursor: mode === 'erase' ? 'not-allowed' : 'crosshair',
           position: 'absolute',
           top: 0,
           left: 0,
-          zIndex: 1,
+          zIndex: 0, // ✅ canvas should be underneath UI
         }}
       />
 
