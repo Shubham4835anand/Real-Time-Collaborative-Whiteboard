@@ -1,0 +1,31 @@
+body,
+html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: sans-serif;
+}
+
+canvas {
+    width: 100vw;
+    height: 100vh;
+    background: #fff;
+    display: block;
+}
+
+.toolbar {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+}
+
+.toolbar input,
+.toolbar button {
+    margin: 0.5rem;
+}
