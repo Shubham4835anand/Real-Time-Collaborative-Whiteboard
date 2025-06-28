@@ -128,6 +128,45 @@ function Room() {
     navigate('/login');
   };
 
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    setPrevPos({ x, y });
+    setIsDrawing(true);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDrawing || !prevPos) return;
+
+    e.preventDefault(); // prevent scrolling while drawing
+
+    const touch = e.touches[0];
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    const stroke = {
+      prevX: prevPos.x,
+      prevY: prevPos.y,
+      x,
+      y,
+      color: mode === 'erase' ? '#ffffff' : color,
+      size: parseInt(size),
+    };
+
+    drawStroke(stroke);
+    socket.emit('drawing', { roomId, ...stroke });
+
+    setPrevPos({ x, y });
+  };
+
   return (
     <>
       <Toolbar
@@ -147,11 +186,15 @@ function Room() {
         onMouseMove={draw}
         onMouseUp={endDrawing}
         onMouseLeave={endDrawing}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={endDrawing}
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
-          zIndex: 0, // ✅ canvas should be underneath UI
+          zIndex: 0,
+          touchAction: 'none', // ✅ canvas should be underneath UI
         }}
       />
 
