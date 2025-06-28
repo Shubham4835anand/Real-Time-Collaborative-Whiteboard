@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import Toolbar from './Toolbar';
-import { useNavigate } from 'react-router-dom';
 
 const socket = io('http://localhost:5000');
 
@@ -15,6 +14,7 @@ function Room() {
   const [color, setColor] = useState('#000000');
   const [size, setSize] = useState(5);
   const [mode, setMode] = useState('draw');
+  const [prevPos, setPrevPos] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -26,72 +26,93 @@ function Room() {
 
     const ctx = canvas.getContext('2d');
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     contextRef.current = ctx;
 
-    socket.on('drawing', drawStroke);
     socket.on('load-drawing', (strokes) => {
-      strokes.forEach(drawStroke);
+      strokes.forEach((stroke) => {
+        drawStroke(stroke);
+      });
     });
+
+    socket.on('drawing', (stroke) => {
+      if (
+        stroke &&
+        stroke.prevX != null &&
+        stroke.prevY != null &&
+        stroke.x != null &&
+        stroke.y != null
+      ) {
+        drawStroke(stroke); // ✅ Simply draw the stroke received from server
+      }
+    });
+
     socket.on('clear-canvas', () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     });
 
     return () => {
       socket.off('drawing');
-      socket.off('load-drawing');
+      socket.off('clear-canvas');
     };
   }, [roomId]);
 
-  const drawStroke = ({ x, y, color, size }) => {
+  const drawStroke = (stroke) => {
+    if (!stroke || stroke.prevX == null || stroke.prevY == null) return;
+
+    const { prevX, prevY, x, y, color, size } = stroke;
     const ctx = contextRef.current;
+    ctx.beginPath();
     ctx.strokeStyle = color;
     ctx.lineWidth = size;
+    ctx.moveTo(prevX, prevY);
     ctx.lineTo(x, y);
     ctx.stroke();
+    ctx.closePath();
   };
 
   const startDrawing = (e) => {
     const { offsetX, offsetY } = e.nativeEvent;
-    contextRef.current.beginPath();
-    contextRef.current.moveTo(offsetX, offsetY);
+    setPrevPos({ x: offsetX, y: offsetY });
     setIsDrawing(true);
   };
 
   const draw = (e) => {
-    if (!isDrawing) return;
+    if (!isDrawing || !prevPos) return;
     const { offsetX, offsetY } = e.nativeEvent;
+    const newPos = { x: offsetX, y: offsetY };
+
     const stroke = {
-      x: offsetX,
-      y: offsetY,
+      prevX: prevPos.x,
+      prevY: prevPos.y,
+      x: newPos.x,
+      y: newPos.y,
       color: mode === 'erase' ? '#ffffff' : color,
       size: parseInt(size),
     };
+
     drawStroke(stroke);
-    socket.emit('drawing', { roomId, stroke });
+    socket.emit('drawing', { roomId, ...stroke }); // ✅ Send to server
+
+    setPrevPos(newPos);
   };
 
   const endDrawing = () => {
-    contextRef.current.closePath();
     setIsDrawing(false);
+    setPrevPos(null);
   };
 
   const handleClear = () => {
-    contextRef.current.clearRect(
-      0,
-      0,
-      canvasRef.current.width,
-      canvasRef.current.height
-    );
+    const canvas = canvasRef.current;
+    contextRef.current.clearRect(0, 0, canvas.width, canvas.height);
     socket.emit('clear-canvas', roomId);
   };
 
   const handleExport = () => {
-    const canvas = document.getElementById('canvas');
-    if (!canvas) return;
-
+    const canvas = canvasRef.current;
     const link = document.createElement('a');
     link.download = 'whiteboard.png';
-    link.href = canvas.toDataURL(); // Convert canvas to base64 PNG
+    link.href = canvas.toDataURL();
     link.click();
   };
 
@@ -112,6 +133,7 @@ function Room() {
         setMode={setMode}
         onClear={handleClear}
       />
+
       <canvas
         id='canvas'
         ref={canvasRef}
@@ -119,20 +141,26 @@ function Room() {
         onMouseMove={draw}
         onMouseUp={endDrawing}
         onMouseLeave={endDrawing}
+        style={{
+          display: 'block',
+          cursor: mode === 'erase' ? 'not-allowed' : 'crosshair',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          zIndex: 1,
+        }}
       />
 
-      <button onClick={handleExport}>Export as PNG</button>
-
-      <button
-        onClick={() => {
-          navigator.clipboard.writeText(roomLink);
-          alert('Room link copied to clipboard!');
-        }}
-      >
-        Copy Invite Link
-      </button>
-
-      <div style={{ textAlign: 'right', padding: '10px' }}>
+      <div style={{ position: 'fixed', top: 10, right: 10, zIndex: 2 }}>
+        <button onClick={handleExport}>Export as PNG</button>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(roomLink);
+            alert('Room link copied to clipboard!');
+          }}
+        >
+          Copy Invite Link
+        </button>
         <button onClick={handleLogout}>Logout</button>
       </div>
     </>

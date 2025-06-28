@@ -14,6 +14,8 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 const app = express();
 const server = http.createServer(app);
+const roomDrawings = {}; // { roomId: [ { x, y, prevX, prevY, color, size } ] }
+
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -42,37 +44,33 @@ mongoose
 
 // 🎨 Real-time Whiteboard Logic
 io.on('connection', (socket) => {
-  console.log('📡 User connected:', socket.id);
-
-  socket.on('join-room', async (roomId) => {
+  socket.on('join-room', (roomId) => {
     socket.join(roomId);
-    console.log(`🟢 ${socket.id} joined room: ${roomId}`);
 
-    const existing = await Drawing.findOne({ roomId });
-    if (existing) {
-      socket.emit('load-drawing', existing.strokes);
+    // Send the existing strokes to the new user
+    if (roomDrawings[roomId]) {
+      socket.emit('load-drawing', roomDrawings[roomId]);
+    } else {
+      roomDrawings[roomId] = [];
     }
   });
 
-  socket.on('drawing', async ({ roomId, stroke }) => {
+  socket.on('drawing', (data) => {
+    if (!data || !data.roomId) return;
+    const { roomId, ...stroke } = data;
+
+    // Save stroke in memory
+    roomDrawings[roomId].push(stroke);
+
+    // Broadcast to others
     socket.to(roomId).emit('drawing', stroke);
-    await Drawing.findOneAndUpdate(
-      { roomId },
-      { $push: { strokes: stroke } },
-      { upsert: true }
-    );
   });
 
-  socket.on('clear-canvas', async (roomId) => {
-    await Drawing.findOneAndUpdate({ roomId }, { strokes: [] });
-    io.to(roomId).emit('clear-canvas');
-  });
-
-  socket.on('disconnect', () => {
-    console.log('❌ User disconnected:', socket.id);
+  socket.on('clear-canvas', (roomId) => {
+    roomDrawings[roomId] = []; // Clear stored strokes
+    socket.to(roomId).emit('clear-canvas');
   });
 });
-
 // 🚀 Start Server
 const PORT = process.env.PORT;
 server.listen(PORT, () => {
