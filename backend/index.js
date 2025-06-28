@@ -1,5 +1,4 @@
 require('dotenv').config();
-
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -7,16 +6,15 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const { Server } = require('socket.io');
 
-const authRoutes = require('./routes/auth');
+const authRoutes = require('./routes/auth'); // ✅ make sure this file exists
+const Drawing = require('./models/Drawing'); // Optional if you're persisting to DB
 
-const Drawing = require('./models/Drawing');
-
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'defaultsecret';
+const MONGO_URI = process.env.MONGO_URI || 'your_fallback_mongo_uri';
+const PORT = process.env.PORT || 5000;
 
 const app = express();
 const server = http.createServer(app);
-const roomDrawings = {}; // { roomId: [ { x, y, prevX, prevY, color, size } ] }
-
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -24,63 +22,69 @@ const io = new Server(server, {
   },
 });
 
-// 🌐 Middleware
+// In-memory drawing cache per room
+const roomDrawings = {}; // { roomId: [ { x, y, prevX, prevY, color, size } ] }
+
+// 🔧 Middleware
 app.use(cors());
 app.use(express.json());
 
-// 🔌 API Routes
+// 🔐 Auth Routes
 app.use('/auth', authRoutes);
 
-// Serve frontend build
+// 🧾 Serve React frontend build (after build)
 app.use(express.static(path.join(__dirname, 'frontend/build')));
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend/build/index.html'));
 });
 
-// 🌍 MongoDB Connection
+// 🌍 MongoDB connection
 mongoose
-  .connect(
-    'mongodb+srv://shubham4835:Destro9708@cluster0.quxo0uz.mongodb.net/',
-    {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    }
-  )
+  .connect(MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
   .then(() => console.log('✅ MongoDB connected'))
-  .catch((err) => console.error('❌ MongoDB error:', err));
+  .catch((err) => console.error('❌ MongoDB connection error:', err));
 
-// 🎨 Real-time Whiteboard Logic
+// 🧠 Real-time socket logic
 io.on('connection', (socket) => {
+  console.log('🟢 New client connected');
+
   socket.on('join-room', (roomId) => {
+    console.log(`➡️ Client joined room: ${roomId}`);
     socket.join(roomId);
 
-    // Send the existing strokes to the new user
-    if (roomDrawings[roomId]) {
-      socket.emit('load-drawing', roomDrawings[roomId]);
-    } else {
+    if (!roomDrawings[roomId]) {
       roomDrawings[roomId] = [];
     }
+
+    // Send existing strokes to new user
+    socket.emit('load-drawing', roomDrawings[roomId]);
   });
 
-  socket.on('drawing', (data) => {
-    if (!data || !data.roomId) return;
-    const { roomId, ...stroke } = data;
+  socket.on('drawing', ({ roomId, ...stroke }) => {
+    if (!roomId) return;
 
     // Save stroke in memory
     roomDrawings[roomId].push(stroke);
 
-    // Broadcast to others
+    // Broadcast to other users in the same room
     socket.to(roomId).emit('drawing', stroke);
   });
 
   socket.on('clear-canvas', (roomId) => {
-    roomDrawings[roomId] = []; // Clear stored strokes
+    if (!roomId) return;
+    roomDrawings[roomId] = [];
     socket.to(roomId).emit('clear-canvas');
   });
+
+  socket.on('disconnect', () => {
+    console.log('🔴 Client disconnected');
+  });
 });
-// 🚀 Start Server
-const PORT = process.env.PORT;
+
+// 🚀 Start server
 server.listen(PORT, () => {
-  console.log(`🚀 Server is running at http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
