@@ -22,7 +22,8 @@ function Login({ setUser }) {
       localStorage.setItem('token', data.token);
       localStorage.setItem('username', data.username);
       setUser(data.username);
-      navigate(`/room/room123`);
+      const roomId = Math.random().toString(36).substring(2, 8); // random 6-char ID
+      navigate(`/room/${roomId}`);
     } else {
       alert('Login failed');
     }

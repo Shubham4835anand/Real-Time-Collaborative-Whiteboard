@@ -9,7 +9,7 @@ const socket = io(
 
 function Room() {
   const { roomId } = useParams();
-  const roomLink = `https://real-time-collaborative-whiteboard-1.onrender.com/room/${roomId}`;
+  const roomLink = `${window.location.origin}/room/${roomId}`;
   const canvasRef = useRef(null);
   const contextRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
