@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './Auth.css'; // Import shared styles
 
-const API_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_BASE_URL;
 
 function Login({ setUser }) {
   const [form, setForm] = useState({ email: '', password: '' });

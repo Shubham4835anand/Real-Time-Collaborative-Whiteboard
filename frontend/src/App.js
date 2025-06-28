@@ -1,7 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:5000');
+const socket = io(
+  'https://real-time-collaborative-whiteboard-4lwp.onrender.com'
+);
 
 function App() {
   const canvasRef = useRef(null);
